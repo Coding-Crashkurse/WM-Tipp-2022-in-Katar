@@ -58,10 +58,12 @@ finals = Final()
 df = read_data()
 df = filter_relevant_data(data=df, teams=teams, label_function=relabel)
 prediction_df = preprocess_df(df, obj_cols=get_obj_cols_in_df(df=df), enc=enc)
+
+
 train_model_from_df(
     prediction_df=prediction_df, train_size=0.8, use_confusion_matrix=True
 )
-time.sleep(10)
+time.sleep(20)
 clf = train_model_from_df(
     prediction_df=prediction_df, train_size=0.99, use_confusion_matrix=False
 )
@@ -105,7 +107,7 @@ solve_matches(
 )
 achtelfinals = af.get_all_matches()
 print(achtelfinals)
-time.sleep(12)
+time.sleep(20)
 
 solve_matches(
     df=df,
@@ -116,7 +118,7 @@ solve_matches(
 )
 viertelfinals = vf.get_all_matches()
 print(viertelfinals)
-time.sleep(10)
+time.sleep(15)
 
 solve_matches(
     df=df,
@@ -127,7 +129,7 @@ solve_matches(
 )
 semifinals = sf.get_all_matches()
 print(semifinals)
-time.sleep(10)
+time.sleep(15)
 
 solve_matches(
     df=df,
@@ -138,6 +140,6 @@ solve_matches(
 )
 final = finals.get_all_matches()
 print(final)
-time.sleep(10)
+time.sleep(15)
 
 solve_matches(df=df, enc=enc, matches=final, message="---- FINALS ----")

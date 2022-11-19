@@ -69,7 +69,7 @@ def solve_matches(
     tableclass=None,
     settattrhelper=None,
     message=None,
-    sleep=0.5,
+    sleep=4,
     groupstage=False,
 ):
     print(message)
