@@ -1,145 +1,122 @@
-import time
-
+import joblib
 from sklearn.preprocessing import OneHotEncoder
-
-from helper import (
-    filter_relevant_data,
-    get_obj_cols_in_df,
-    preprocess_df,
-    read_data,
-    relabel,
-    solve_matches,
-    train_model_from_df,
-)
-from table import AchtelFinals, Final, Semifinals, ViertelFinals
+import pandas as pd
+import time
 
 enc = OneHotEncoder(handle_unknown="ignore", sparse=False)
 
-teams = [
-    "Germany",
-    "Denmark",
-    "France",
-    "Belgium",
-    "Croatia",
-    "Spain",
-    "Serbia",
-    "Switzerland",
-    "England",
-    "Netherlands",
-    "Portugal",
-    "Poland",
-    "Wales",
-    "Marokko",
-    "Kamerun",
-    "Tunisia",
-    "Senegal",
-    "Ghana",
-    "Qatar",
-    "Japan",
-    "South Korea",
-    "Saudi Arabia",
-    "Iran",
-    "Australia",
-    "Brasil",
-    "Argentina",
-    "Uruguay",
-    "Ecuador",
-    "Canada",
-    "Mexiko",
-    "USA",
-    "Costa Rica",
-]
 
-af = AchtelFinals()
-vf = ViertelFinals()
-sf = Semifinals()
-finals = Final()
-
-df = read_data()
-df = filter_relevant_data(data=df, teams=teams, label_function=relabel)
-prediction_df = preprocess_df(df, obj_cols=get_obj_cols_in_df(df=df), enc=enc)
+def read_data(
+    path="./results.csv",
+):
+    df = pd.read_csv(path)
+    return df
 
 
-train_model_from_df(
-    prediction_df=prediction_df, train_size=0.8, use_confusion_matrix=True
-)
-time.sleep(20)
-clf = train_model_from_df(
-    prediction_df=prediction_df, train_size=0.99, use_confusion_matrix=False
-)
-
-# Gruppe A
-gruppe_a = ["Ecuador", "Qatar", "Netherlands", "Senegal"]
-# Gruppe B
-gruppe_b = ["England", "Iran", "USA", "Wales"]
-# Gruppe C
-gruppe_c = ["Argentina", "Mexiko", "Poland", "Saudi Arabia"]
-# Gruppe D
-gruppe_d = ["Australia", "Denmark", "France", "Tunisia"]
-# Gruppe E
-gruppe_e = ["Germany", "Costa Rica", "Japan", "Spain"]
-# Gruppe F
-gruppe_f = ["Belgium", "Canada", "Croatia", "Marokko"]
-# Gruppe G
-gruppe_g = ["Brasil", "Kamerun", "Switzerland", "Serbia"]
-# Gruppe H
-gruppe_h = ["Ghana", "Portugal", "South Korea", "Uruguay"]
-
-vorrunde = [
-    gruppe_a,
-    gruppe_b,
-    gruppe_c,
-    gruppe_d,
-    gruppe_e,
-    gruppe_f,
-    gruppe_g,
-    gruppe_h,
-]
+def relabel(df):
+    if df["home_score"] == df["away_score"]:
+        return 0
+    elif df["home_score"] > df["away_score"]:
+        return 1
+    else:
+        return -1
 
 
-solve_matches(
-    df=df,
-    enc=enc,
-    matches=vorrunde,
-    tableclass=af,
-    groupstage=True,
-    message="---- VORRUNDE ----",
-)
-achtelfinals = af.get_all_matches()
-print(achtelfinals)
-time.sleep(20)
+def get_obj_cols_in_df(df):
+    obj_cols = df.columns[df.dtypes == "object"].to_list()
+    return obj_cols
 
-solve_matches(
-    df=df,
-    enc=enc,
-    matches=achtelfinals,
-    tableclass=vf,
-    message="---- ACHTELFINALS ----",
-)
-viertelfinals = vf.get_all_matches()
-print(viertelfinals)
-time.sleep(15)
 
-solve_matches(
-    df=df,
-    enc=enc,
-    matches=viertelfinals,
-    tableclass=sf,
-    message="---- VIERTELFINALS ----",
-)
-semifinals = sf.get_all_matches()
-print(semifinals)
-time.sleep(15)
+def filter_relevant_data(data, label_function):
+    df = data.drop(["city", "country", "neutral"], axis=1)
+    df = df[df.date > "2015-01-01"]
+    df = df.drop(["tournament", "date"], axis=1)
+    df["Heimsieg"] = df.apply(label_function, axis=1)
+    df.drop(["home_score", "away_score"], axis=1, inplace=True)
+    return df
 
-solve_matches(
-    df=df,
-    enc=enc,
-    matches=semifinals,
-    tableclass=finals,
-    message="---- SEMIFINALS ----",
-)
-final = finals.get_all_matches()
-print(final)
-time.sleep(15)
 
-solve_matches(df=df, enc=enc, matches=final, message="---- FINALS ----")
+def preprocess_df(df, obj_cols, enc):
+    encoded_columns = pd.DataFrame(enc.fit_transform(df[obj_cols]))
+    numerical_data = df.drop(obj_cols, axis=1)
+    numerical_data = numerical_data.reset_index().drop("index", axis=1)
+    encoded_columns = encoded_columns.reset_index().drop("index", axis=1)
+    preprocessed_df = pd.concat([numerical_data, encoded_columns], axis=1)
+    return preprocessed_df
+
+
+df = read_data("./results.csv")
+df = filter_relevant_data(df, label_function=relabel)
+
+obj_cols = get_obj_cols_in_df(df)
+
+clf = joblib.load("./model.job")
+
+
+def create_new_prediction_df(df, kommende_spiele, obj_cols, enc):
+    new_df = pd.concat([df, kommende_spiele], ignore_index=True)
+    encoded_columns = pd.DataFrame(enc.fit_transform(new_df[obj_cols]))
+    numerical_data = df.drop(obj_cols, axis=1)
+    numerical_data = numerical_data.reset_index().drop("index", axis=1)
+    encoded_columns = encoded_columns.reset_index().drop("index", axis=1)
+    preprocessed_df = pd.concat([numerical_data, encoded_columns], axis=1)
+    return preprocessed_df
+
+
+def predict_winner(home, away):
+    kommende_spiele_dict = {
+        "home_team": [home, away],
+        "away_team": [away, home],
+        "Heimsieg": [None, None],
+    }
+    kommende_spiele = pd.DataFrame(data=kommende_spiele_dict)
+    prediction_df = create_new_prediction_df(
+        df, kommende_spiele=kommende_spiele, obj_cols=obj_cols, enc=enc
+    )
+    X_data = prediction_df.drop("Heimsieg", axis=1)
+    X_test = X_data.tail(2)
+    y_pred = clf.predict_proba(X_test)
+    # print(y_pred)
+    home_added = (y_pred[0][0] + y_pred[1][0]) / 2
+    away_added = (y_pred[0][2] + y_pred[1][2]) / 2
+    winner = home if home_added > away_added else away
+    print(
+        f"{home} - {round(home_added * 100, 2)}% | {away} - {round(away_added * 100, 2)}% - Sieger: {winner}"
+    )
+    time.sleep(3)
+    return winner
+
+
+viertelfinale1 = [None, None]
+viertelfinale2 = [None, None]
+viertelfinale3 = [None, None]
+viertelfinale4 = [None, None]
+
+halbfinale1 = [None, None]
+halbfinale2 = [None, None]
+
+finale = [None, None]
+
+print("---- Achtelfinals ----")
+viertelfinale1[0] = predict_winner("Netherlands", "United States")
+viertelfinale1[1] = predict_winner("Argentina", "Australia")
+viertelfinale2[0] = predict_winner("France", "Poland")
+viertelfinale2[1] = predict_winner("England", "Senegal")
+viertelfinale3[0] = predict_winner("Japan", "Croatia")
+viertelfinale3[1] = predict_winner("", "South Korea")
+viertelfinale4[0] = predict_winner("Morocco", "Spain")
+viertelfinale4[1] = predict_winner("Portugal", "")
+
+print("---- Viertelfinals ----")
+halbfinale1[0] = predict_winner(viertelfinale1[0], viertelfinale1[1])
+halbfinale1[1] = predict_winner(viertelfinale2[0], viertelfinale2[1])
+halbfinale2[0] = predict_winner(viertelfinale3[0], viertelfinale3[1])
+halbfinale2[1] = predict_winner(viertelfinale4[0], viertelfinale4[1])
+
+print("---- Halbfinals ----")
+finale[0] = predict_winner(halbfinale1[0], halbfinale1[1])
+finale[1] = predict_winner(halbfinale2[0], halbfinale2[1])
+
+print("---- Finale ----")
+sieger = predict_winner(finale[0], finale[1])
+print("Weltmeister ist:", sieger)
