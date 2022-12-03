@@ -50,7 +50,7 @@ df = filter_relevant_data(df, label_function=relabel)
 
 obj_cols = get_obj_cols_in_df(df)
 
-clf = joblib.load("./model.job")
+clf = joblib.load("./light_gbm.job")
 
 
 def create_new_prediction_df(df, kommende_spiele, obj_cols, enc):
@@ -83,7 +83,7 @@ def predict_winner(home, away):
     print(
         f"{home} - {round(home_added * 100, 2)}% | {away} - {round(away_added * 100, 2)}% - Sieger: {winner}"
     )
-    time.sleep(3)
+    time.sleep(5)
     return winner
 
 
@@ -103,9 +103,9 @@ viertelfinale1[1] = predict_winner("Argentina", "Australia")
 viertelfinale2[0] = predict_winner("France", "Poland")
 viertelfinale2[1] = predict_winner("England", "Senegal")
 viertelfinale3[0] = predict_winner("Japan", "Croatia")
-viertelfinale3[1] = predict_winner("", "South Korea")
+viertelfinale3[1] = predict_winner("Brazil", "South Korea")
 viertelfinale4[0] = predict_winner("Morocco", "Spain")
-viertelfinale4[1] = predict_winner("Portugal", "")
+viertelfinale4[1] = predict_winner("Portugal", "Switzerland")
 
 print("---- Viertelfinals ----")
 halbfinale1[0] = predict_winner(viertelfinale1[0], viertelfinale1[1])

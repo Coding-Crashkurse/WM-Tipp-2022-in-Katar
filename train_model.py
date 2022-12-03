@@ -1,7 +1,6 @@
 from joblib import dump
 from sklearn.preprocessing import OneHotEncoder
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import RandomizedSearchCV
 from lightgbm import LGBMClassifier
 
